@@ -1,0 +1,179 @@
+{% extends "network/layout.html" %}
+
+{% block body %}
+<h1 class="titles">All Posts</h1>
+    <script>
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`)
+            if (parts.length == 2) return parts.pop().split(';').shift();
+        }
+
+        function submitHandler(id) {
+            const textareaValue = document.getElementById(`textarea_${id}`).value;
+            const content = document.getElementById(`content_${id}`)
+            const modal = document.getElementById(`modal_edit_post_${id}`)
+            fetch(`/edit/${id}`, {
+                method: "POST",
+                headers: {"Content-type": "application/json", "X-CSRFToken": getCookie("csrftoken")},
+                body: JSON.stringify({
+                    content: textareaValue
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.message.trim() === "Change successful") {
+                    content.innerHTML = result.data;
+                    // on every modal change state like in hidden modal
+                    modal.classList.remove('show');
+                    modal.setAttribute('aria-hidden', 'true');
+                    modal.setAttribute('style', 'display: none');
+                    
+                    // get modal backdrops
+                    const modalsBackdrops = document.getElementsByClassName('modal-backdrop');
+
+                    // remove every modal backdrop
+                    for (let i = 0; i < modalsBackdrops.length; i++) {
+                        document.body.removeChild(modalsBackdrops[i]);
+                    }
+                }else {
+                    alert('Error: Unable to save changes');
+                }
+            })
+        }
+
+        function likeHandler(id, postsLiked) {
+            const btn = document.getElementById(`${id}`);
+
+            btn.classList.remove('fa-thumbs-up')
+            btn.classList.remove('fa-thumbs-down')
+
+            if (postsLiked.indexOf(id) >= 0) {
+                console.log(`Post ${id} is already liked.`);
+                var liked = true;
+            } else {
+                console.log(`Post ${id} is not liked yet.`);
+                var liked = false;
+            }
+
+            if (liked === true){
+                console.log(`Removing like for post ${id}.`);
+                fetch(`/remove_like/${id}`)
+                .then(response => response.json())
+                .then(result => {
+                    console.log(`Like removed for post ${id}.`);
+                    btn.classList.add('fa-thumbs-up')
+                    liked = false; // Update liked to false
+                    console.log(`Liked status for post ${id} updated to false`);
+                    // if (liked === true){
+                        // btn.classList.remove('fa-thumbs-down')
+                        // btn.classList.add('fa-thumbs-up')
+                        // liked = false;
+                        // console.log(`Liked status for post ${id} updated to false`);
+                    // } else {
+                        // btn.classList.remove('fa-thumbs-up')
+                        // btn.classList.add('fa-thumbs-down')
+                        // liked = true;
+                        // console.log(`Liked status for post ${id} updated to true`);
+                    // }
+                })
+            } else {
+                console.log(`Adding like for post ${id}.`);
+                fetch(`/add_like/${id}`)
+                .then(response => response.json())
+                .then(result => {
+                    console.log(`Like added for post ${id}.`);
+                    // btn.classList.remove('fa-thumbs-up')
+                    btn.classList.add('fa-thumbs-down')
+                    liked = true; // Update liked to true
+                    console.log(`Liked status for post ${id} updated to true`);
+                    // if (liked === true){
+                        // btn.classList.remove('fa-thumbs-up')
+                        // btn.classList.add('fa-thumbs-down')
+                        // liked = true;
+                        // console.log(`Liked status for post ${id} updated to true`);
+                    // } else {
+                        // btn.classList.remove('fa-thumbs-down')
+                        // btn.classList.add('fa-thumbs-up')
+                        // liked = false;
+                        // console.log(`Liked status for post ${id} updated to false`);
+                    // }
+                })
+            }
+            liked = !liked
+            console.log(`Liked status for post ${id} updated to ${liked}`);
+        }
+    </script>
+
+    <hr>
+
+    <div class="post-container">
+        {% if user.is_authenticated %}
+            <div class="new-post-container">
+                <h3 class="new-post"> New Post</h3>
+                <form class="from" action="{% url 'newPost' %}" method="post">
+                     {% csrf_token %}
+                     <textarea class="area" name="content" rows="2" cols="50"></textarea>
+                     <br>
+                     <input type="submit" value="Post" class="btn post-btn btn-primary">
+                </form>
+            </div>
+        {% endif %}
+
+        <div class="all-posts">
+            {% for post in posts_of_the_page %}
+                <div class="show-all-posts">
+                    <h5 class="user"><a href="{% url 'profile' user_id=post.user.id %}">@{{ post.user }}</a></h5>
+                    <p class="post-content" id="content_{{ post.id }}">{{ post.content }}</p>
+                    <p class="date">{{ post.date }}</p>
+                    {% if user.is_authenticated %}
+                        {% if user == post.user %}
+                            <div class="d-flex justify-content-around">
+                                <button class="btn edit-btn btn-primary" data-toggle="modal" data-target="#modal_edit_post_{{ post.id }}">Edit</button>
+                            </div>
+
+                            <div class="modal fade" id="modal_edit_post_{{ post.id }}" tabindex="-1" role="dialog" aria-labelledby="modal_edit_post_{{ post.id }}_label" aria-hidden="true">
+                                <div class="modal-dialog" role="document">
+                                  <div class="modal-content">
+                                    <div class="modal-header">
+                                      <h5 class="modal-title">Edit Post</h5>
+                                      <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <span aria-hidden="true">&times;</span>
+                                      </button>
+                                    </div>
+                                    <div class="modal-body">
+                                      <textarea rows="5"  id="textarea_{{ post.id }}" class="form-control" name="content">{{ post.content }}</textarea>
+                                    </div>
+                                    <div class="modal-footer">
+                                      <button type="button" class="btn btn-primary" onclick="submitHandler({{ post.id }})">Save changes</button>
+                                      <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                        {% else %}
+                              {% if post.id in postsLiked %}
+                                <!--This means that we already liked the post-->
+                                <button class="like-btn fa fa-thumbs-down col-1" onclick="likeHandler({{ post.id }}, {{ postsLiked }})" id="{{ post.id }}"></button>
+                              {% else %}
+                                <!--Haven't liked it yet-->
+                                <button class="like-btn active fa fa-thumbs-up col-1" onclick="likeHandler({{ post.id }}, {{ postsLiked }})" id="{{ post.id }}"></button>
+                              {% endif %}
+                        {% endif %}
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+
+        <nav aria-label="Page navigation example">
+            <ul class="pagination d-flex justify-content-center">
+                {% if posts_of_the_page.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page={{ posts_of_the_page.previous_page_number }}">Previous</a></li>
+                {% endif %}
+                {% if posts_of_the_page.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ posts_of_the_page.next_page_number }}">Next Page</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+{% endblock %}
